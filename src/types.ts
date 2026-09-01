@@ -1,5 +1,19 @@
 /** Types partagés du MCP Obsidian ↔ Claude. */
 
+/**
+ * Tag qui identifie une note suivie par le MCP.
+ *
+ * Un tag Obsidian plutôt qu'une clé maison : il participe à la recherche, au
+ * graphe, à Dataview et au volet Tags, et se pose depuis l'interface sans
+ * éditer de YAML. Imbriqué sous `claude/` pour ne pas polluer la taxonomie
+ * thématique du vault.
+ *
+ * La détection ne lit que le frontmatter. Le même tag est aussi posé en tête
+ * de corps à la création, pour la mise en valeur des extensions Obsidian, mais
+ * cette occurrence-là est décorative : elle ne rend pas une note suivie.
+ */
+export const PROJECT_TAG = "claude/project";
+
 /** Frontmatter d'un fichier projet (cf. templates/project-template.md). */
 export type ProjectFrontmatter = {
   title: string;
@@ -15,7 +29,6 @@ export type ProjectFrontmatter = {
   sources: string[];
   open_issues: string[];
   resolved_issues: string[];
-  claude_project: true;
   session_count: number;
   /** Toute clé ajoutée à la main dans le vault est préservée telle quelle. */
   [key: string]: unknown;

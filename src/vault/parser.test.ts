@@ -11,6 +11,7 @@ import {
   getSectionText,
   isProjectNote,
   listItems,
+  frontmatterTags,
   parseNote,
   SectionNotFoundError,
   serializeNote,
@@ -49,10 +50,54 @@ test("une note sans frontmatter est traversée sans dommage", async () => {
   assert.equal(isProjectNote(note.data), false);
 });
 
-test("seules les notes marquées claude_project sont reconnues", async () => {
+test("seules les notes portant le tag projet sont reconnues", async () => {
   assert.equal(isProjectNote(parseNote(await lire(AVANCE)).data), true);
   assert.equal(isProjectNote(parseNote(await lire(FRAIS)).data), true);
   assert.equal(isProjectNote(parseNote(await lire(SANS_MARQUEUR)).data), false);
+});
+
+test("frontmatterTags accepte les trois formes admises par Obsidian", () => {
+  assert.deepEqual(frontmatterTags({ tags: ["Domotique", "#claude/project"] }), [
+    "domotique",
+    "claude/project",
+  ]);
+  assert.deepEqual(frontmatterTags({ tags: "domotique, claude/project" }), [
+    "domotique",
+    "claude/project",
+  ]);
+  assert.deepEqual(frontmatterTags({ tag: ["claude/project"] }), ["claude/project"]);
+  assert.deepEqual(frontmatterTags({ tags: [] }), []);
+  assert.deepEqual(frontmatterTags({}), []);
+  assert.deepEqual(frontmatterTags(null), []);
+});
+
+test("le tag inline du corps ne suffit pas à marquer une note", () => {
+  const raw = [
+    "---",
+    'title: "Fausse note"',
+    "tags: [veille]",
+    "---",
+    "",
+    "#claude/project",
+    "",
+    "## 🎯 Vision",
+    "",
+    "> Une note qui cite le tag sans le déclarer.",
+    "",
+  ].join("\n");
+
+  const note = parseNote(raw);
+  assert.equal(isProjectNote(note.data), false, "seul le frontmatter fait foi");
+  assert.ok(note.body.includes("#claude/project"), "le tag décoratif reste dans le corps");
+});
+
+test("les notes suivies portent le tag en frontmatter et en tête de corps", async () => {
+  const note = parseNote(await lire(AVANCE));
+
+  assert.ok(frontmatterTags(note.data).includes("claude/project"));
+  assert.ok(note.body.startsWith("\n#claude/project\n"), "tag décoratif en tête de corps");
+  // Le tag décoratif ne perturbe pas le repérage des sections.
+  assert.ok(getSectionText(note.body, "vision")?.startsWith("> Reprendre le contrôle"));
 });
 
 test("modifier le frontmatter préserve commentaires et clés hors schéma", async () => {
