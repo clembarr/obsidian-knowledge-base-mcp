@@ -1,0 +1,34 @@
+{
+  "name": "obsidian-knowledge-base-mcp",
+  "version": "0.1.0",
+  "description": "Serveur MCP faisant le pont entre un vault Obsidian et Claude, pour la mémoire inter-sessions.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "obsidian-knowledge-base-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "check": "tsc --noEmit",
+    "test": "tsc && node --test dist",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
