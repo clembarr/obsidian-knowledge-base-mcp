@@ -29,11 +29,23 @@ export class VaultPathError extends Error {
   override name = "VaultPathError";
 }
 
+export type FsVaultOptions = {
+  /**
+   * Dossier, relatif au vault, seul autorisé en écriture. Par défaut le vault
+   * entier. Le passer restreint physiquement la casse : le reste de la base de
+   * connaissance devient inatteignable, même par un tool qui s'égarerait.
+   */
+  writableFolder?: string;
+};
+
 export class FsVaultClient implements VaultClient {
   readonly root: string;
+  /** Racine autorisée en écriture. La lecture, elle, couvre tout le vault. */
+  readonly writableRoot: string;
 
-  constructor(vaultPath: string) {
+  constructor(vaultPath: string, options: FsVaultOptions = {}) {
     this.root = path.resolve(vaultPath);
+    this.writableRoot = options.writableFolder ? this.resolve(options.writableFolder) : this.root;
   }
 
   /** Vérifie au démarrage que la racine existe et est bien un dossier. */
@@ -58,6 +70,18 @@ export class FsVaultClient implements VaultClient {
     const relative = path.relative(this.root, absolute);
     if (relative.startsWith("..") || path.isAbsolute(relative)) {
       throw new VaultPathError(`Chemin hors du vault : ${notePath}`);
+    }
+    return absolute;
+  }
+
+  /** Comme `resolve`, mais refuse aussi tout ce qui sort du dossier accessible en écriture. */
+  resolveWritable(notePath: string): string {
+    const absolute = this.resolve(notePath);
+    const relative = path.relative(this.writableRoot, absolute);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      throw new VaultPathError(
+        `Écriture refusée hors du dossier projets (${path.relative(this.root, this.writableRoot) || "."}) : ${notePath}`,
+      );
     }
     return absolute;
   }
@@ -100,7 +124,7 @@ export class FsVaultClient implements VaultClient {
    * le processus meurt en cours de route.
    */
   async write(notePath: string, content: string): Promise<void> {
-    const absolute = this.resolve(notePath);
+    const absolute = this.resolveWritable(notePath);
     const dir = path.dirname(absolute);
     await mkdir(dir, { recursive: true });
 

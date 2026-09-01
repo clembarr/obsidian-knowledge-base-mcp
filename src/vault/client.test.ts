@@ -128,6 +128,35 @@ test("une écriture ne touche à aucune autre note", async () => {
   );
 });
 
+test("l'écriture est refusée hors du dossier projets", async () => {
+  const bac = await bacASable();
+  const confine = new FsVaultClient(bac.root, { writableFolder: "PROJETS" });
+
+  // Le dossier autorisé reste accessible.
+  await confine.write("PROJETS/Nouveau projet.md", "# ok\n");
+  assert.equal(await confine.exists("PROJETS/Nouveau projet.md"), true);
+
+  // Le reste de la base de connaissance est intouchable.
+  for (const chemin of [
+    "README.md",
+    "RESSOURCES/Zigbee — notes de compatibilité.md",
+    "PROJETS/../README.md",
+  ]) {
+    await assert.rejects(() => confine.write(chemin, "écrasé"), VaultPathError, `accepté à tort : ${chemin}`);
+  }
+
+  // Et rien n'a été touché au passage.
+  assert.match(await confine.read("README.md"), /Vault de test/);
+});
+
+test("la lecture reste ouverte à tout le vault même en écriture confinée", async () => {
+  const confine = new FsVaultClient(VAULT, { writableFolder: "PROJETS" });
+
+  const ressource = await confine.read("RESSOURCES/Zigbee — notes de compatibilité.md");
+  assert.match(ressource, /notes de compatibilité/);
+  assert.ok((await confine.listNotes()).includes("README.md"));
+});
+
 test("l'API n'expose aucun moyen de supprimer", () => {
   const client = lecture as unknown as Record<string, unknown>;
   for (const interdit of ["delete", "remove", "unlink", "rm", "destroy"]) {
