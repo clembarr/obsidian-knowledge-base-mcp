@@ -12,6 +12,15 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { loadConfig, type Config } from "./config.js";
 import {
+  formatContext,
+  getProjectContext,
+  getProjectContextInputShape,
+  getProjectContextOutputShape,
+  GET_PROJECT_CONTEXT_DESCRIPTION,
+  ProjectNotFoundError,
+  AmbiguousProjectError,
+} from "./tools/get_project_context.js";
+import {
   formatProjects,
   listProjects,
   listProjectsOutputShape,
@@ -39,6 +48,33 @@ function createServer(vault: FsVaultClient, config: Config): McpServer {
         content: [{ type: "text", text: formatProjects(projects, config) }],
         structuredContent: { projects },
       };
+    },
+  );
+
+  server.registerTool(
+    "get_project_context",
+    {
+      title: "Charger le contexte d'un projet",
+      description: GET_PROJECT_CONTEXT_DESCRIPTION,
+      inputSchema: getProjectContextInputShape,
+      outputSchema: getProjectContextOutputShape,
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ project_title }) => {
+      try {
+        const context = await getProjectContext(vault, config, project_title);
+        return {
+          content: [{ type: "text", text: formatContext(context) }],
+          structuredContent: context,
+        };
+      } catch (error) {
+        // Titre inconnu ou ambigu : le message liste les projets disponibles,
+        // ce qui permet au modèle de corriger son appel sans nouvel aller-retour.
+        if (error instanceof ProjectNotFoundError || error instanceof AmbiguousProjectError) {
+          return { content: [{ type: "text", text: error.message }], isError: true };
+        }
+        throw error;
+      }
     },
   );
 
