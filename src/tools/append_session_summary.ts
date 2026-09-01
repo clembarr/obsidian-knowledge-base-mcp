@@ -149,70 +149,78 @@ export async function appendSessionSummary(
 ): Promise<SessionRecorded> {
   const projet = findProject(await loadProjects(vault, config), query);
 
-  // Relecture depuis le disque : la note peut avoir changé dans Obsidian entre
-  // le get_project_context du début de session et ce bilan de fin.
-  const note = parseNote(await vault.read(projet.path));
-  if (!note.doc) throw new Error(`Frontmatter absent de ${projet.path}`);
+  // Tout le lire-modifier-écrire passe par `update`, donc sous verrou : deux
+  // bilans concurrents sur le même projet liraient sinon le même
+  // `session_count` et produiraient deux fois la même session, la seconde
+  // écriture perdant l'entrée de journal de la première. La relecture depuis
+  // le disque sert aussi à rattraper une note modifiée dans Obsidian depuis
+  // le get_project_context du début de session.
+  return vault.update(projet.path, (raw) => {
+    const note = parseNote(raw);
+    if (!note.doc) throw new Error(`Frontmatter absent de ${projet.path}`);
 
-  const date = summary.date ?? today(now);
-  const etapePrecedente = readString(note.data ?? {}, "next_step");
-  const compte = Number(note.data?.["session_count"] ?? 0);
-  const numero = (Number.isFinite(compte) ? compte : 0) + 1;
+    const date = summary.date ?? today(now);
+    const etapePrecedente = readString(note.data ?? {}, "next_step");
+    const compte = Number(note.data?.["session_count"] ?? 0);
+    const numero = (Number.isFinite(compte) ? compte : 0) + 1;
 
-  /* --- Frontmatter : l'état courant, celui que relit list_projects --- */
+    /* --- Frontmatter : l'état courant, celui que relit list_projects --- */
 
-  const resolus = union(readSequence(note.data, "resolved_issues"), summary.resolved_issues);
-  const ouverts = without(
-    union(readSequence(note.data, "open_issues"), summary.open_issues),
-    summary.resolved_issues,
-  );
+    const resolus = union(readSequence(note.data, "resolved_issues"), summary.resolved_issues);
+    const ouverts = without(
+      union(readSequence(note.data, "open_issues"), summary.open_issues),
+      summary.resolved_issues,
+    );
 
-  setScalar(note.doc, "last_session", date);
-  setScalar(note.doc, "next_step", summary.next_step.trim());
-  setScalar(note.doc, "session_count", numero);
-  if (summary.progress) setScalar(note.doc, "progress", summary.progress.trim());
-  if (summary.current_phase) setScalar(note.doc, "current_phase", summary.current_phase.trim());
-  setSequence(note.doc, "open_issues", ouverts, "block");
-  setSequence(note.doc, "resolved_issues", resolus, "block");
+    setScalar(note.doc, "last_session", date);
+    setScalar(note.doc, "next_step", summary.next_step.trim());
+    setScalar(note.doc, "session_count", numero);
+    if (summary.progress) setScalar(note.doc, "progress", summary.progress.trim());
+    if (summary.current_phase) setScalar(note.doc, "current_phase", summary.current_phase.trim());
+    setSequence(note.doc, "open_issues", ouverts, "block");
+    setSequence(note.doc, "resolved_issues", resolus, "block");
 
-  /* --- Corps : le récit et ce qui s'accumule --- */
+    /* --- Corps : le récit et ce qui s'accumule --- */
 
-  let body = note.body;
-  for (const section of ["journal", "decisions", "questions"] as const) {
-    body = ensureSection(body, section, note.eol);
-  }
+    let body = note.body;
+    for (const section of ["journal", "decisions", "questions"] as const) {
+      body = ensureSection(body, section, note.eol);
+    }
 
-  body = appendToSection(body, "journal", journalEntry(numero, date, summary.discussed), note.eol);
+    body = appendToSection(body, "journal", journalEntry(numero, date, summary.discussed), note.eol);
 
-  // Les décisions sont datées à l'écriture : la liste se lit comme une frise.
-  const avantDecisions = body;
-  body = appendListItems(
-    body,
-    "decisions",
-    summary.new_decisions.map((decision) => `[${date}] ${decision.trim()}`),
-    note.eol,
-  );
-  const decisionsAjoutees = body === avantDecisions ? 0 : summary.new_decisions.length;
+    // Les décisions sont datées à l'écriture : la liste se lit comme une frise.
+    const avantDecisions = body;
+    body = appendListItems(
+      body,
+      "decisions",
+      summary.new_decisions.map((decision) => `[${date}] ${decision.trim()}`),
+      note.eol,
+    );
+    const decisionsAjoutees = body === avantDecisions ? 0 : summary.new_decisions.length;
 
-  const avantQuestions = body;
-  body = appendListItems(body, "questions", summary.open_questions, note.eol);
-  const questionsAjoutees = body === avantQuestions ? 0 : summary.open_questions.length;
+    const avantQuestions = body;
+    body = appendListItems(body, "questions", summary.open_questions, note.eol);
+    const questionsAjoutees = body === avantQuestions ? 0 : summary.open_questions.length;
 
-  note.body = body;
-  await vault.write(projet.path, serializeNote(note));
+    note.body = body;
 
-  return {
-    title: projectTitle(projet),
-    path: projet.path,
-    session_number: numero,
-    date,
-    next_step: summary.next_step.trim(),
-    open_issues: ouverts,
-    resolved_issues: resolus,
-    added_decisions: decisionsAjoutees,
-    added_questions: questionsAjoutees,
-    previous_next_step: etapePrecedente,
-  };
+    return {
+      content: serializeNote(note),
+      value: {
+        title: projectTitle(projet),
+        path: projet.path,
+        session_number: numero,
+        date,
+        next_step: summary.next_step.trim(),
+        open_issues: ouverts,
+        resolved_issues: resolus,
+        added_decisions: decisionsAjoutees,
+        added_questions: questionsAjoutees,
+        previous_next_step: etapePrecedente,
+      },
+    };
+  });
 }
 
 export function formatRecorded(bilan: SessionRecorded): string {

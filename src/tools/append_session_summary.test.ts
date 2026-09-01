@@ -320,3 +320,56 @@ test("les listes de phrases restent en bloc, les listes de jetons en inline", as
   assert.match(brut, /tags: \[claude\/project\]/);
   assert.match(brut, /stack: \[ESP32\]/);
 });
+
+test("des bilans concurrents sont sérialisés, aucun n'est perdu", async () => {
+  const { vault, config, notePath } = await projetNeuf();
+
+  // Le serveur MCP sert ses requêtes en parallèle : sans verrou, les trois
+  // appels liraient le même session_count et deux entrées de journal
+  // seraient écrasées.
+  const bilans = await Promise.all(
+    [1, 2, 3].map((n) =>
+      appendSessionSummary(
+        vault,
+        config,
+        "Serre connectée",
+        { ...BILAN, discussed: `Session ${n}.`, new_decisions: [], open_questions: [] },
+        LE_JOUR,
+      ),
+    ),
+  );
+
+  assert.deepEqual(
+    bilans.map((bilan) => bilan.session_number).sort(),
+    [1, 2, 3],
+    "chaque bilan doit recevoir son propre numéro",
+  );
+
+  const brut = await readFile(notePath, "utf8");
+  assert.match(brut, /session_count: 3/);
+  for (const n of [1, 2, 3]) {
+    assert.match(brut, new RegExp(`### Session ${n} — 2026-09-01`));
+    assert.match(brut, new RegExp(`> Session ${n}\\.`));
+  }
+});
+
+test("des bilans concurrents sur des projets différents n'interfèrent pas", async () => {
+  const { vault, config } = await projetNeuf();
+  await createProject(vault, config, { title: "Ruche", summary: "Suivi de colonie." }, LE_JOUR);
+
+  const [serre, ruche] = await Promise.all([
+    appendSessionSummary(vault, config, "Serre connectée", BILAN, LE_JOUR),
+    appendSessionSummary(
+      vault,
+      config,
+      "Ruche",
+      { ...BILAN, next_step: "Peser la ruche", new_decisions: [], open_questions: [] },
+      LE_JOUR,
+    ),
+  ]);
+
+  assert.equal(serre!.session_number, 1);
+  assert.equal(ruche!.session_number, 1);
+  assert.equal(serre!.next_step, "Souder le capteur d'humidité");
+  assert.equal(ruche!.next_step, "Peser la ruche");
+});

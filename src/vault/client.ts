@@ -13,6 +13,8 @@ import { randomBytes } from "node:crypto";
 import { access, link, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { KeyedMutex } from "./lock.js";
+
 /** Seule extension considérée comme une note. Exclut notamment les `.mdenc` chiffrés. */
 const NOTE_EXTENSION = ".md";
 
@@ -23,8 +25,15 @@ export interface VaultClient {
   write(notePath: string, content: string): Promise<void>;
   /** Comme `write`, mais échoue si la note existe déjà. */
   create(notePath: string, content: string): Promise<void>;
+  /** Lecture-modification-écriture sérialisée : deux mises à jour d'une même note ne se chevauchent pas. */
+  update<T>(notePath: string, transform: NoteTransform<T>): Promise<T>;
   exists(notePath: string): Promise<boolean>;
 }
+
+/** Nouveau contenu de la note, et ce que l'appelant veut retirer de l'opération. */
+export type NoteUpdate<T> = { content: string; value: T };
+
+export type NoteTransform<T> = (raw: string) => NoteUpdate<T> | Promise<NoteUpdate<T>>;
 
 /** Chemin sortant du vault, ou vault introuvable. */
 export class VaultPathError extends Error {
@@ -52,6 +61,8 @@ export class FsVaultClient implements VaultClient {
   readonly root: string;
   /** Racine autorisée en écriture. La lecture, elle, couvre tout le vault. */
   readonly writableRoot: string;
+  /** Une file d'attente par note, pour les mises à jour. */
+  readonly #locks = new KeyedMutex();
 
   constructor(vaultPath: string, options: FsVaultOptions = {}) {
     this.root = path.resolve(vaultPath);
@@ -178,6 +189,25 @@ export class FsVaultClient implements VaultClient {
       // Après `rename` le temporaire n'existe plus ; après `link` il reste à retirer.
       await rm(temp, { force: true });
     }
+  }
+
+  /**
+   * Met à jour une note sous verrou : personne d'autre ne peut la lire pour
+   * la réécrire tant que la transformation n'a pas été publiée.
+   *
+   * C'est ce qui rend sûr un `append` : sans cela, deux appels concurrents
+   * liraient le même `session_count` et produiraient deux fois la session 3,
+   * la seconde écriture perdant l'entrée de journal de la première.
+   */
+  async update<T>(notePath: string, transform: NoteTransform<T>): Promise<T> {
+    // Résolu hors du verrou : un chemin invalide doit échouer tout de suite.
+    const absolute = this.resolveWritable(notePath);
+
+    return this.#locks.run(absolute, async () => {
+      const { content, value } = await transform(await this.read(notePath));
+      await this.write(notePath, content);
+      return value;
+    });
   }
 
   async exists(notePath: string): Promise<boolean> {
