@@ -12,6 +12,13 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { loadConfig, type Config } from "./config.js";
 import {
+  appendSessionSummary,
+  appendSessionSummaryInputShape,
+  appendSessionSummaryOutputShape,
+  formatRecorded,
+  APPEND_SESSION_SUMMARY_DESCRIPTION,
+} from "./tools/append_session_summary.js";
+import {
   createProject,
   createProjectInputShape,
   createProjectOutputShape,
@@ -111,6 +118,38 @@ function createServer(vault: FsVaultClient, config: Config): McpServer {
         };
       } catch (error) {
         if (error instanceof ProjectExistsError || error instanceof InvalidTitleError) {
+          return { content: [{ type: "text", text: error.message }], isError: true };
+        }
+        throw error;
+      }
+    },
+  );
+
+  server.registerTool(
+    "append_session_summary",
+    {
+      title: "Enregistrer le bilan de la session",
+      description: APPEND_SESSION_SUMMARY_DESCRIPTION,
+      inputSchema: appendSessionSummaryInputShape,
+      outputSchema: appendSessionSummaryOutputShape,
+      // `destructiveHint: false` : l'écriture n'ajoute et ne met à jour que des
+      // champs ; aucun contenu existant du corps n'est retiré.
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ project_title, summary }) => {
+      try {
+        const bilan = await appendSessionSummary(vault, config, project_title, summary);
+        return {
+          content: [{ type: "text", text: formatRecorded(bilan) }],
+          structuredContent: bilan,
+        };
+      } catch (error) {
+        if (error instanceof ProjectNotFoundError || error instanceof AmbiguousProjectError) {
           return { content: [{ type: "text", text: error.message }], isError: true };
         }
         throw error;

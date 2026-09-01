@@ -14,13 +14,13 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isSeq, type Document, type Scalar, type YAMLSeq } from "yaml";
 import { z } from "zod";
 
 import type { Config } from "../config.js";
 import { loadProjects, projectTitle } from "../projects.js";
 import { PROJECT_TAG, SECTIONS } from "../types.js";
 import { NoteExistsError, type VaultClient } from "../vault/client.js";
+import { setScalar, setSequence } from "../vault/frontmatter.js";
 import { findSection, parseNote, serializeNote } from "../vault/parser.js";
 
 const TEMPLATE_PATH = fileURLToPath(new URL("../../templates/project-template.md", import.meta.url));
@@ -106,34 +106,6 @@ export function fileNameFor(title: string): string {
 }
 
 /**
- * Écrit une valeur scalaire en conservant le style du template.
- *
- * `doc.set` remplacerait le nœud et perdrait ses guillemets : on modifie donc
- * le scalaire en place quand la clé existe déjà, pour que `title: "…"` reste
- * entre guillemets et `session_count: 0` reste nu.
- */
-function setScalar(doc: Document, key: string, value: string | number): void {
-  const node = doc.get(key, true) as Scalar | undefined;
-  if (node && typeof node === "object" && "value" in node) {
-    node.value = value;
-    return;
-  }
-  doc.set(key, value);
-}
-
-/** Remplace le contenu d'une liste en conservant son style, bloc ou inline. */
-function setSequence(doc: Document, key: string, values: string[]): void {
-  const node = doc.get(key, true);
-  if (isSeq(node)) {
-    const seq = node as YAMLSeq;
-    seq.items.length = 0;
-    for (const value of values) seq.add(value);
-    return;
-  }
-  doc.set(key, values);
-}
-
-/**
  * Vide une section de ses exemples et y met le texte donné.
  *
  * Le template porte des placeholders (`- [YYYY-MM-DD] …`, `### Session 1 — …`)
@@ -195,9 +167,9 @@ export async function createProject(
   setScalar(note.doc, "next_step", input.next_step?.trim() || "Définir la première étape");
 
   setSequence(note.doc, "stack", input.stack ?? []);
-  setSequence(note.doc, "sources", []);
-  setSequence(note.doc, "open_issues", []);
-  setSequence(note.doc, "resolved_issues", []);
+  setSequence(note.doc, "sources", [], "block");
+  setSequence(note.doc, "open_issues", [], "block");
+  setSequence(note.doc, "resolved_issues", [], "block");
   // Le tag du template est conservé ; un vault qui en configure un autre le reçoit ici.
   if (config.projectTag !== PROJECT_TAG) setSequence(note.doc, "tags", [config.projectTag]);
 
