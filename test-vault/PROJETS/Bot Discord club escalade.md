@@ -4,7 +4,7 @@ title: "Bot Discord club escalade"
 status: "idée"
 created: 2026-09-01
 last_session: 2026-09-01
-tags: [discord, bot]
+tags: [discord, bot, claude/project]
 
 # Avancement
 progress: "0%"
@@ -21,9 +21,10 @@ open_issues: []
 resolved_issues: []
 
 # Meta
-claude_project: true
 session_count: 0
 ---
+
+#claude/project
 
 ## 🎯 Vision
 

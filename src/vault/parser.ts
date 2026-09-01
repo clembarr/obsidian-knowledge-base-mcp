@@ -13,7 +13,7 @@
  */
 
 import { parseDocument, type Document } from "yaml";
-import { SECTIONS, type SectionKey } from "../types.js";
+import { PROJECT_TAG, SECTIONS, type SectionKey } from "../types.js";
 
 /**
  * `lineWidth: 0` désactive le repli des lignes longues (sinon un `summary` de
@@ -84,9 +84,38 @@ export function serializeNote(note: ParsedNote): string {
   return `---${note.eol}${yaml}${note.eol}---${note.eol}${note.body}`;
 }
 
-/** Une note n'est suivie par le MCP que si elle porte `claude_project: true`. */
-export function isProjectNote(data: Record<string, unknown> | null): boolean {
-  return data !== null && data["claude_project"] === true;
+/** Normalise un tag : sans `#`, sans espaces superflus, insensible à la casse. */
+function normalizeTag(value: string): string {
+  return value.trim().replace(/^#/, "").toLowerCase();
+}
+
+/**
+ * Tags déclarés dans le frontmatter.
+ *
+ * Obsidian accepte trois formes : une liste (`tags: [a, b]`), une chaîne
+ * (`tags: a, b`) et la clé historique `tag:`. Les trois sont reconnues.
+ * Les `#tags` inline du corps sont volontairement ignorés : un tag cité en
+ * prose marquerait la note par accident.
+ */
+export function frontmatterTags(data: Record<string, unknown> | null): string[] {
+  if (!data) return [];
+
+  const raw = data["tags"] ?? data["tag"];
+  const values = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string"
+      ? raw.split(/[,\s]+/)
+      : [];
+
+  return values
+    .filter((value): value is string => typeof value === "string")
+    .map(normalizeTag)
+    .filter((tag) => tag.length > 0);
+}
+
+/** Une note n'est suivie par le MCP que si son frontmatter porte le tag projet. */
+export function isProjectNote(data: Record<string, unknown> | null, tag = PROJECT_TAG): boolean {
+  return frontmatterTags(data).includes(normalizeTag(tag));
 }
 
 /* ------------------------------------------------------------------ */

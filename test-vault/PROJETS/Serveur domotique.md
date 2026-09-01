@@ -4,7 +4,7 @@ title: "Serveur domotique"
 status: "en cours"
 created: 2026-06-14
 last_session: 2026-08-28
-tags: [domotique, self-hosted, rpi]
+tags: [domotique, self-hosted, rpi, claude/project]
 
 # Avancement
 progress: "60%"
@@ -27,12 +27,13 @@ resolved_issues:
   - "Docker vs installation native"
 
 # Meta
-claude_project: true
 session_count: 3
 
 # Clé perso ajoutée à la main — doit survivre aux écritures du MCP
 budget: "230 €"
 ---
+
+#claude/project
 
 ## 🎯 Vision
 

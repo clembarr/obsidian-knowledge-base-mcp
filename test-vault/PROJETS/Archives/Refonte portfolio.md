@@ -3,7 +3,7 @@ title: "Refonte portfolio"
 status: "en pause"
 created: 2025-11-08
 last_session: 2026-02-15
-tags: [web, design]
+tags: [web, design, claude/project]
 progress: "35%"
 current_phase: "Phase 2 — Intégration"
 next_step: "Reprendre l'intégration de la page projets"
@@ -14,9 +14,10 @@ open_issues:
   - "Le choix typographique n'est pas tranché"
 resolved_issues:
   - "Astro retenu contre Next.js"
-claude_project: true
 session_count: 2
 ---
+
+#claude/project
 
 ## 🎯 Vision
 
