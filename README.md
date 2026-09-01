@@ -1,4 +1,4 @@
-# obsidian-knowledge-base-mcp
+# 🧠 obsidian-knowledge-base-mcp
 
 Serveur MCP qui donne à Claude la mémoire de vos projets, à partir d'un vault
 Obsidian.
@@ -9,7 +9,7 @@ vous ayez à le réexpliquer. En fin de session, il écrit lui-même le bilan da
 la note. Vous ne tapez rien : la base de connaissance reste du markdown que vous
 lisez et modifiez normalement dans Obsidian.
 
-## Principe
+## 🔖 Principe
 
 Une note projet est un fichier `.md` ordinaire. Deux conditions pour qu'elle
 soit suivie :
@@ -51,7 +51,13 @@ Le corps suit un template en cinq sections : Vision, Décisions validées,
 Architecture / Design actuel, Journal des sessions, Questions ouvertes. Voir
 [`templates/project-template.md`](templates/project-template.md).
 
-## Architecture
+## 🏗️ Architecture
+
+![Architecture du serveur](docs/architecture.svg)
+
+Le schéma est aussi fourni en source modifiable :
+[`docs/architecture.excalidraw`](docs/architecture.excalidraw), à ouvrir sur
+[excalidraw.com](https://excalidraw.com) ou dans le plugin Excalidraw d'Obsidian.
 
 Accès direct au système de fichiers, pas de plugin ni de serveur HTTP à faire
 tourner : Obsidian n'a même pas besoin d'être ouvert. `VaultClient` est
@@ -92,7 +98,7 @@ Quatre garanties portent le reste :
 Les écritures sont en outre confinées au dossier projets : le reste du vault est
 lisible, jamais modifiable.
 
-## Installation
+## ⚙️ Installation
 
 Prérequis : Node 20 ou plus, et pnpm.
 
@@ -144,7 +150,7 @@ cas, elle sera suivie dès la conversation suivante.
 Un vault d'exemple est fourni dans `test-vault/` pour essayer sans toucher à vos
 notes.
 
-## Cheatsheet
+## 📋 Cheatsheet
 
 ### Tools
 
@@ -195,6 +201,6 @@ une décision déjà prise n'est jamais réécrite.
 Après toute modification du code, relancez `pnpm build` puis redémarrez la
 conversation : le serveur tourne depuis `dist/`.
 
-## Licence
+## ⚖️ Licence
 
 Apache-2.0
