@@ -10,7 +10,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { access, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, link, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /** Seule extension considérée comme une note. Exclut notamment les `.mdenc` chiffrés. */
@@ -21,12 +21,22 @@ export interface VaultClient {
   listNotes(folder?: string): Promise<string[]>;
   read(notePath: string): Promise<string>;
   write(notePath: string, content: string): Promise<void>;
+  /** Comme `write`, mais échoue si la note existe déjà. */
+  create(notePath: string, content: string): Promise<void>;
   exists(notePath: string): Promise<boolean>;
 }
 
 /** Chemin sortant du vault, ou vault introuvable. */
 export class VaultPathError extends Error {
   override name = "VaultPathError";
+}
+
+/** `create` sur une note déjà présente. */
+export class NoteExistsError extends Error {
+  override name = "NoteExistsError";
+  constructor(readonly notePath: string) {
+    super(`La note existe déjà : ${notePath}`);
+  }
 }
 
 export type FsVaultOptions = {
@@ -116,14 +126,45 @@ export class FsVaultClient implements VaultClient {
     return readFile(this.resolve(notePath), "utf8");
   }
 
-  /**
-   * Écriture atomique : fichier temporaire dans le même dossier, puis `rename`.
-   *
-   * Le `rename` est atomique sur un même système de fichiers, donc une note
-   * ouverte dans Obsidian ne peut jamais être observée à moitié écrite, même si
-   * le processus meurt en cours de route.
-   */
+  /** Écriture atomique, création ou remplacement. */
   async write(notePath: string, content: string): Promise<void> {
+    await this.#stage(notePath, content, (temp, absolute) => rename(temp, absolute));
+  }
+
+  /**
+   * Création exclusive : `link` échoue avec EEXIST si la cible existe déjà.
+   *
+   * Le contrôle est fait par le noyau, au moment même de la publication du
+   * fichier. Un `exists()` préalable, lui, laisserait une fenêtre entre la
+   * vérification et l'écriture — les requêtes MCP étant servies en parallèle,
+   * deux créations simultanées du même projet s'y engouffreraient et la
+   * seconde écraserait la première.
+   */
+  async create(notePath: string, content: string): Promise<void> {
+    await this.#stage(notePath, content, async (temp, absolute) => {
+      try {
+        await link(temp, absolute);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+          throw new NoteExistsError(notePath);
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Écrit dans un fichier temporaire du même dossier, puis le publie.
+   *
+   * La publication se faisant sur le même système de fichiers, elle est
+   * atomique : une note ouverte dans Obsidian ne peut jamais être observée à
+   * moitié écrite, même si le processus meurt en cours de route.
+   */
+  async #stage(
+    notePath: string,
+    content: string,
+    publish: (temp: string, absolute: string) => Promise<void>,
+  ): Promise<void> {
     const absolute = this.resolveWritable(notePath);
     const dir = path.dirname(absolute);
     await mkdir(dir, { recursive: true });
@@ -132,10 +173,10 @@ export class FsVaultClient implements VaultClient {
     const temp = path.join(dir, `.${path.basename(absolute)}.${randomBytes(6).toString("hex")}.tmp`);
     try {
       await writeFile(temp, content, "utf8");
-      await rename(temp, absolute);
-    } catch (error) {
+      await publish(temp, absolute);
+    } finally {
+      // Après `rename` le temporaire n'existe plus ; après `link` il reste à retirer.
       await rm(temp, { force: true });
-      throw error;
     }
   }
 

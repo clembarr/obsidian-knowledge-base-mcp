@@ -12,6 +12,15 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { loadConfig, type Config } from "./config.js";
 import {
+  createProject,
+  createProjectInputShape,
+  createProjectOutputShape,
+  formatCreated,
+  InvalidTitleError,
+  ProjectExistsError,
+  CREATE_PROJECT_DESCRIPTION,
+} from "./tools/create_project.js";
+import {
   formatContext,
   getProjectContext,
   getProjectContextInputShape,
@@ -71,6 +80,37 @@ function createServer(vault: FsVaultClient, config: Config): McpServer {
         // Titre inconnu ou ambigu : le message liste les projets disponibles,
         // ce qui permet au modèle de corriger son appel sans nouvel aller-retour.
         if (error instanceof ProjectNotFoundError || error instanceof AmbiguousProjectError) {
+          return { content: [{ type: "text", text: error.message }], isError: true };
+        }
+        throw error;
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_project",
+    {
+      title: "Créer un projet",
+      description: CREATE_PROJECT_DESCRIPTION,
+      inputSchema: createProjectInputShape,
+      outputSchema: createProjectOutputShape,
+      // `destructiveHint: false` : la création n'écrase jamais une note existante.
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (input) => {
+      try {
+        const projet = await createProject(vault, config, input);
+        return {
+          content: [{ type: "text", text: formatCreated(projet) }],
+          structuredContent: projet,
+        };
+      } catch (error) {
+        if (error instanceof ProjectExistsError || error instanceof InvalidTitleError) {
           return { content: [{ type: "text", text: error.message }], isError: true };
         }
         throw error;
