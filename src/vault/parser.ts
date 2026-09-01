@@ -240,6 +240,21 @@ export function appendToSection(body: string, key: SectionKey, text: string, eol
   return assemble(before, text.trim(), after, eol, eol + eol);
 }
 
+/**
+ * Garantit qu'une section existe, en l'ajoutant en fin de corps si besoin.
+ *
+ * Une note taguée à la main dans Obsidian ne suit pas forcément le template.
+ * Plutôt que d'échouer, on lui ajoute la section manquante : l'utilisateur
+ * garde une note exploitable, et rien de ce qu'il avait écrit n'est déplacé.
+ */
+export function ensureSection(body: string, key: SectionKey, eol = "\n"): string {
+  if (findSection(body, key)) return body;
+
+  const base = body.replace(/\s+$/, "");
+  const separateur = base.length > 0 ? eol + eol : "";
+  return `${base}${separateur}${SECTIONS[key]}${eol}`;
+}
+
 /* ------------------------------------------------------------------ */
 /* Listes à puces                                                      */
 /* ------------------------------------------------------------------ */
@@ -258,7 +273,7 @@ export function listItems(body: string, key: SectionKey): string[] {
 }
 
 /** Deux décisions ne diffèrent pas par leur date ni par leur casse. */
-function normalizeItem(item: string): string {
+export function normalizeItem(item: string): string {
   return item.replace(DATE_PREFIX_RE, "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
