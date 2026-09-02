@@ -1,15 +1,15 @@
-# 🧠 obsidian-knowledge-base-mcp
+# Suivit des projets assistés par IA dans Obsidian
 
 Serveur MCP qui donne à Claude la mémoire de vos projets, à partir d'un vault
 Obsidian.
 
-À chaque nouvelle conversation, Claude retrouve où en est un projet — décisions
-prises, architecture actuelle, problèmes ouverts, prochaine étape — sans que
+À chaque nouvelle conversation, Claude retrouve où en est un projet, décisions
+prises, architecture actuelle, problèmes ouverts, prochaine étape, sans que
 vous ayez à le réexpliquer. En fin de session, il écrit lui-même le bilan dans
 la note. Vous ne tapez rien : la base de connaissance reste du markdown que vous
 lisez et modifiez normalement dans Obsidian.
 
-## 🔖 Principe
+## :brain: Principe
 
 Une note projet est un fichier `.md` ordinaire. Deux conditions pour qu'elle
 soit suivie :
@@ -24,7 +24,7 @@ Le tag est un tag Obsidian, pas une clé maison. Il participe donc à la
 recherche, au graphe, à Dataview et au volet Tags, et se pose depuis l'interface
 sans éditer de YAML.
 
-Le frontmatter porte l'état courant du projet — c'est lui que le serveur lit
+Le frontmatter porte l'état courant du projet, c'est lui que le serveur lit
 pour dresser la liste des projets sans ouvrir une seule note :
 
 ```yaml
@@ -35,7 +35,7 @@ created: 2026-09-01
 last_session: 2026-09-08
 tags: [claude/project]
 progress: "45%"
-current_phase: "Phase 2 — Prototype"
+current_phase: "Phase 2, Prototype"
 next_step: "Mesurer la consommation sur une semaine"
 summary: "Arrosage automatique du potager, piloté par capteurs."
 stack: [ESP32, LoRa]
@@ -55,29 +55,12 @@ Architecture / Design actuel, Journal des sessions, Questions ouvertes. Voir
 
 ![Architecture du serveur](docs/architecture.svg)
 
-Le schéma est aussi fourni en source modifiable :
-[`docs/architecture.excalidraw`](docs/architecture.excalidraw), à ouvrir sur
-[excalidraw.com](https://excalidraw.com) ou dans le plugin Excalidraw d'Obsidian.
-
 Accès direct au système de fichiers, pas de plugin ni de serveur HTTP à faire
 tourner : Obsidian n'a même pas besoin d'être ouvert. `VaultClient` est
 néanmoins une interface étroite, pour qu'une implémentation sur le plugin
 [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api)
 puisse être ajoutée sans toucher aux tools.
 
-```
-src/
-├── index.ts              Point d'entrée MCP (transport stdio)
-├── config.ts             Configuration lue dans l'environnement
-├── projects.ts           Chargement et filtrage des notes projet
-├── types.ts              Types partagés et titres de sections
-├── tools/                Un fichier par tool MCP
-└── vault/
-    ├── client.ts         Accès fichiers : lecture, écriture atomique, verrou
-    ├── parser.ts         Frontmatter YAML et sections markdown
-    ├── frontmatter.ts    Écriture des champs sans casser le style existant
-    └── lock.ts           File d'attente par note
-```
 
 Quatre garanties portent le reste :
 
@@ -137,7 +120,7 @@ Ou dans `claude_desktop_config.json` :
 
 | Variable                | Défaut           | Rôle                                      |
 | ----------------------- | ---------------- | ----------------------------------------- |
-| `VAULT_PATH`            | — (obligatoire)  | Chemin absolu du vault Obsidian           |
+| `VAULT_PATH`            |, (obligatoire)  | Chemin absolu du vault Obsidian           |
 | `VAULT_PROJECTS_FOLDER` | `PROJETS`        | Dossier des notes projet, relatif au vault |
 | `CLAUDE_PROJECT_TAG`    | `claude/project` | Tag qui marque une note comme suivie      |
 
@@ -201,6 +184,6 @@ une décision déjà prise n'est jamais réécrite.
 Après toute modification du code, relancez `pnpm build` puis redémarrez la
 conversation : le serveur tourne depuis `dist/`.
 
-## ⚖️ Licence
+## Licence
 
 Apache-2.0
