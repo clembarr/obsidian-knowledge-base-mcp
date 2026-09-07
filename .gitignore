@@ -25,3 +25,7 @@ desktop.ini
 # mais pas les artefacts de config Obsidian ni les copies de travail.
 test-vault/.obsidian/
 test-vault/.trash/
+
+.claude/
+CLAUDE.md
+TODO.md
